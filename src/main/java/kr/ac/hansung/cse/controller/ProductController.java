@@ -38,13 +38,10 @@ public class ProductController {
 
     private final ProductService productService;
 
-    /**
-     * 생성자 주입 (Constructor Injection)
-     * Spring 4.3+: 생성자가 하나뿐이면 @Autowired를 생략할 수 있습니다.
-     */
     public ProductController(ProductService productService) {
         this.productService = productService;
     }
+
 
     // ─────────────────────────────────────────────────────────────────
     // GET /products - 상품 목록 조회
@@ -69,12 +66,12 @@ public class ProductController {
      *   → GlobalExceptionHandler.handleProductNotFound()가 처리합니다.
      */
     @GetMapping("/{id}")
-    public String productDetail(@PathVariable Long id, Model model) {
+    public String showProduct(@PathVariable Long id, Model model) {
         Product product = productService.getProductById(id)
                 .orElseThrow(() -> new ProductNotFoundException(id));
 
         model.addAttribute("product", product);
-        return "productDetail";
+        return "productView";
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -137,7 +134,10 @@ public class ProductController {
         }
 
         // 검증 통과: ProductForm → Product 엔티티 변환 후 저장
-        Product savedProduct = productService.createProduct(productForm.toEntity());
+        // category 이름으로 Category 엔티티를 조회하여 연결합니다.
+        Product product = productForm.toEntity();
+        product.setCategory(productService.resolveCategory(productForm.getCategory()));
+        Product savedProduct = productService.createProduct(product);
 
         // Flash 속성: 리다이렉트 후 한 번만 표시되는 메시지
         redirectAttributes.addFlashAttribute("successMessage",
@@ -202,7 +202,7 @@ public class ProductController {
 
         // 폼 데이터로 엔티티 필드를 업데이트합니다.
         product.setName(productForm.getName());
-        product.setCategory(productForm.getCategory());
+        product.setCategory(productService.resolveCategory(productForm.getCategory()));
         product.setPrice(productForm.getPrice());
         product.setDescription(productForm.getDescription());
 
