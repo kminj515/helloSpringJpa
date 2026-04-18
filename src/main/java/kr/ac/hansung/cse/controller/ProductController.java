@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import kr.ac.hansung.cse.exception.ProductNotFoundException;
 import kr.ac.hansung.cse.model.Product;
 import kr.ac.hansung.cse.model.ProductForm;
+import kr.ac.hansung.cse.service.CategoryService;
 import kr.ac.hansung.cse.service.ProductService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -24,10 +25,10 @@ import java.util.List;
  *   3. 어떤 View를 렌더링할지 결정하여 뷰 이름을 반환합니다.
  *
  * [엔드포인트 목록]
- * GET  /products          → 상품 목록
- * GET  /products/{id}     → 상품 상세
- * GET  /products/create   → 상품 등록 폼
- * POST /products/create   → 상품 등록 처리
+ * GET  /products            → 상품 목록 / 검색 / 카테고리 필터
+ * GET  /products/{id}       → 상품 상세
+ * GET  /products/create     → 상품 등록 폼
+ * POST /products/create     → 상품 등록 처리
  * GET  /products/{id}/edit  → 상품 수정 폼
  * POST /products/{id}/edit  → 상품 수정 처리
  * POST /products/{id}/delete → 상품 삭제 처리
@@ -37,20 +38,45 @@ import java.util.List;
 public class ProductController {
 
     private final ProductService productService;
+    private final CategoryService categoryService;
 
-    public ProductController(ProductService productService) {
+    public ProductController(ProductService productService,
+                             CategoryService categoryService) {
         this.productService = productService;
+        this.categoryService = categoryService;
     }
 
-
     // ─────────────────────────────────────────────────────────────────
-    // GET /products - 상품 목록 조회
+    // GET /products - 상품 목록 조회 / 검색 / 카테고리 필터
     // ─────────────────────────────────────────────────────────────────
 
     @GetMapping
-    public String listProducts(Model model) {
-        List<Product> products = productService.getAllProducts();
+    public String listProducts(@RequestParam(required = false) String keyword,
+                               @RequestParam(required = false) Long categoryId,
+                               Model model) {
+
+        List<Product> products;
+
+        // 이름 검색
+        if (keyword != null && !keyword.isBlank()) {
+            products = productService.searchByName(keyword);
+
+            // 카테고리 필터
+        } else if (categoryId != null) {
+            products = productService.searchByCategory(categoryId);
+
+            // 전체 목록
+        } else {
+            products = productService.getAllProducts();
+        }
+
         model.addAttribute("products", products);
+
+        // 검색 폼에 필요한 데이터
+        model.addAttribute("categories", categoryService.getAllCategories());
+        model.addAttribute("keyword", keyword);
+        model.addAttribute("categoryId", categoryId);
+
         return "productList";
     }
 
@@ -92,6 +118,7 @@ public class ProductController {
     @GetMapping("/create")
     public String showCreateForm(Model model) {
         model.addAttribute("productForm", new ProductForm());
+        model.addAttribute("categories", categoryService.getAllCategories());
         return "productForm";
     }
 
@@ -124,13 +151,15 @@ public class ProductController {
     @PostMapping("/create")
     public String createProduct(@Valid @ModelAttribute("productForm") ProductForm productForm,
                                 BindingResult bindingResult,
-                                RedirectAttributes redirectAttributes) {
+                                RedirectAttributes redirectAttributes,
+                                Model model) {
 
         // 검증 오류가 있으면 폼을 다시 표시합니다.
         // bindingResult는 productForm과 함께 Model에 자동으로 포함되므로
         // Thymeleaf에서 th:errors로 오류 메시지에 접근할 수 있습니다.
         if (bindingResult.hasErrors()) {
-            return "productForm"; // 오류가 있는 채로 폼 뷰 재표시
+            model.addAttribute("categories", categoryService.getAllCategories());
+            return "productForm";
         }
 
         // 검증 통과: ProductForm → Product 엔티티 변환 후 저장
@@ -162,6 +191,7 @@ public class ProductController {
 
         // 엔티티 → DTO 변환 (기존 데이터로 폼 초기화)
         model.addAttribute("productForm", ProductForm.from(product));
+        model.addAttribute("categories", categoryService.getAllCategories());
         return "productEditForm";
     }
 
@@ -190,9 +220,11 @@ public class ProductController {
     public String updateProduct(@PathVariable Long id,
                                 @Valid @ModelAttribute("productForm") ProductForm productForm,
                                 BindingResult bindingResult,
-                                RedirectAttributes redirectAttributes) {
+                                RedirectAttributes redirectAttributes,
+                                Model model) {
 
         if (bindingResult.hasErrors()) {
+            model.addAttribute("categories", categoryService.getAllCategories());
             return "productEditForm"; // 오류가 있는 채로 수정 폼 재표시
         }
 
