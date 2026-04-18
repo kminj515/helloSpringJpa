@@ -119,6 +119,9 @@
             </tr>
         </tbody>
     </table>
-
+    <div style="margin-top:40px; padding-top:15px; border-top:1px solid #ccc; font-size:14px; color:#555;">
+        <p th:text="${'실습 수행 일시: ' + #temporals.format(#temporals.createNow(), 'yyyy-MM-dd HH:mm:ss')}"></p>
+        <p>학번: 2371377 | 성명: 김민주</p>
+    </div>
 </body>
 </html>
